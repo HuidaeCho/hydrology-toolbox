@@ -170,7 +170,7 @@ class StreamNetworkDelineation(object):
         streamVect = arcpy.Parameter(
                 displayName="Stream Vector",
                 name="stream_vector",
-                datatype="DEFeatureDataset",
+                datatype="DEFeatureClass",
                 parameterType="Required",
                 direction="Output")
         params = [facc, thresh, streamRast, streamVect]
@@ -239,7 +239,7 @@ class WatershedDelineation(object):
         watershedVect = arcpy.Parameter(
                 displayName="Watershed Vector",
                 name="watershed_vector",
-                datatype="DEFeatureDataset",
+                datatype="DEFeatureClass",
                 parameterType="Required",
                 direction="Output")
         params = [fdir, outlets, watershedRast, watershedVect]
