@@ -131,14 +131,14 @@ class FlowAccumulation(object):
         fdir = parameters[2].valueAsText
         facc = parameters[3].valueAsText
 
-        outFill = arcpy.sa.Fill(elev)
-        outFill.save(fill)
+        fill_out = arcpy.sa.Fill(elev)
+        fill_out.save(fill)
 
-        outFlowDirection = arcpy.sa.FlowDirection(fill)
-        outFlowDirection.save(fdir)
+        fdir_out = arcpy.sa.FlowDirection(fill)
+        fdir_out.save(fdir)
 
-        outFlowAccumulation = arcpy.sa.FlowAccumulation(fdir)
-        outFlowAccumulation.save(facc)
+        facc_out = arcpy.sa.FlowAccumulation(fdir)
+        facc_out.save(facc)
         return
 
 
@@ -163,19 +163,19 @@ class StreamNetworkDelineation(object):
                 datatype="GPLong",
                 parameterType="Required",
                 direction="Input")
-        streamRast = arcpy.Parameter(
+        stream_rast = arcpy.Parameter(
                 displayName="Stream Raster",
                 name="stream_raster",
                 datatype="DERasterDataset",
                 parameterType="Required",
                 direction="Output")
-        streamVect = arcpy.Parameter(
+        stream_vect = arcpy.Parameter(
                 displayName="Stream Vector",
                 name="stream_vector",
                 datatype="DEFeatureClass",
                 parameterType="Required",
                 direction="Output")
-        params = [facc, thresh, streamRast, streamVect]
+        params = [facc, thresh, stream_rast, stream_vect]
         return params
 
     def isLicensed(self):
@@ -197,17 +197,15 @@ class StreamNetworkDelineation(object):
         """The source code of the tool."""
         facc = parameters[0].valueAsText
         thresh = parameters[1].value
-        streamRast = parameters[2].valueAsText
-        streamVect = parameters[3].valueAsText
+        stream_rast = parameters[2].valueAsText
+        stream_vect = parameters[3].valueAsText
 
-        outStreamRast = arcpy.sa.Con(arcpy.Raster(facc) >= thresh, 1, 0)
-        outStreamRast.save(streamRast)
+        stream_rast_out = arcpy.sa.Con(arcpy.Raster(facc) >= thresh, 1, 0)
+        stream_rast_out.save(stream_rast)
 
-        arcpy.RasterToPolyline_conversion(streamRast, streamVect)
+        arcpy.RasterToPolyline_conversion(stream_rast, stream_vect)
 
-        aprx = arcpy.mp.ArcGISProject("CURRENT")
-        aprxMap = aprx.listMaps("Map")[0]
-        aprxMap.addDataFromPath(streamVect)
+        arcpy.mp.ArcGISProject("CURRENT").activeMap.addDataFromPath(stream_vect)
         return
 
 
@@ -232,19 +230,19 @@ class WatershedDelineation(object):
                 datatype="GPFeatureRecordSetLayer",
                 parameterType="Required",
                 direction="Input")
-        watershedRast = arcpy.Parameter(
-                displayName="Watershed Raster",
-                name="watershed_raster",
+        wsheds_rast = arcpy.Parameter(
+                displayName="Watersheds Raster",
+                name="watersheds_raster",
                 datatype="DERasterDataset",
                 parameterType="Required",
                 direction="Output")
-        watershedVect = arcpy.Parameter(
-                displayName="Watershed Vector",
-                name="watershed_vector",
+        wsheds_vect = arcpy.Parameter(
+                displayName="Watersheds Vector",
+                name="watersheds_vector",
                 datatype="DEFeatureClass",
                 parameterType="Required",
                 direction="Output")
-        params = [fdir, outlets, watershedRast, watershedVect]
+        params = [fdir, outlets, wsheds_rast, wsheds_vect]
         return params
 
     def isLicensed(self):
@@ -266,21 +264,20 @@ class WatershedDelineation(object):
         """The source code of the tool."""
         fdir = parameters[0].valueAsText
         outlets = parameters[1].valueAsText
-        watershedRast = parameters[2].valueAsText
-        watershedVect = parameters[3].valueAsText
+        wsheds_rast = parameters[2].valueAsText
+        wsheds_vect = parameters[3].valueAsText
 
         arcpy.env.extent = "MAXOF"
-        outletsOidFieldName = arcpy.Describe(outlets).OIDFieldName
-        outWatershed = arcpy.sa.Watershed(fdir, outlets, outletsOidFieldName)
-        outWatershed.save(watershedRast)
+        outlets_oid = arcpy.Describe(outlets).OIDFieldName
+        wsheds_rast_out = arcpy.sa.Watershed(fdir, outlets, outlets_oid)
+        wsheds_rast_out.save(wsheds_rast)
 
-        arcpy.RasterToPolygon_conversion(watershedRast, watershedVect)
+        arcpy.RasterToPolygon_conversion(wsheds_rast, wsheds_vect)
 
-        aprx = arcpy.mp.ArcGISProject("CURRENT")
-        aprxMap = aprx.listMaps("Map")[0]
-        aprxMap.addDataFromPath(watershedVect)
+        arcpy.mp.ArcGISProject("CURRENT").activeMap.addDataFromPath(wsheds_vect)
         return
-        
+
+
 class LongestFlowPath(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
@@ -313,7 +310,7 @@ class LongestFlowPath(object):
                 name="output_prefix",
                 datatype="GPString",
                 parameterType="Required",
-                direction="Input")          
+                direction="Input")
         params = [fdir, outlets, output_path, output_prefix]
         return params
 
@@ -340,32 +337,35 @@ class LongestFlowPath(object):
         output_prefix = parameters[3].value
 
         output_path = re.sub(r'\\+$', '', output_path) + '\\'
-    
+
         arcpy.env.extent = "MAXOF"
         wsheds = arcpy.sa.Watershed(fdir, outlets, 'OBJECTID')
         wsheds.save(output_path + output_prefix + 'wsheds.tif')
-    
+
         with arcpy.da.SearchCursor(outlets, ['OID@']) as cur:
             for row in cur:
                 oid = row[0]
-    
+
                 wshed = arcpy.sa.ExtractByAttributes(wsheds, 'VALUE = {}'.format(oid))
                 wshed.save(output_path + output_prefix + 'wshed_{}.tif'.format(oid))
-    
+
                 wshed_fdir = arcpy.sa.ExtractByMask(fdir, wshed)
                 wshed_fdir.save(output_path + output_prefix + 'wshed_fdir_{}.tif'.format(oid))
-    
+
                 wshed_uplen = arcpy.sa.FlowLength(wshed_fdir, "UPSTREAM")
                 wshed_uplen.save(output_path + output_prefix + 'wshed_uplen_{}.tif'.format(oid))
-    
+
                 wshed_dnlen = arcpy.sa.FlowLength(wshed_fdir, "DOWNSTREAM")
                 wshed_dnlen.save(output_path + output_prefix + 'wshed_dnlen_{}.tif'.format(oid))
-    
+
                 wshed_updnlen = wshed_uplen + wshed_dnlen
                 wshed_updnlen.save(output_path + output_prefix + 'wshed_updnlen_{}.tif'.format(oid))
-    
+
                 wshed_lfp = arcpy.sa.Con(wshed_updnlen >= int(wshed_updnlen.maximum), 1, 0)
                 wshed_lfp.save(output_path + output_prefix + 'wshed_lfp_{}.tif'.format(oid))
-    
-                arcpy.RasterToPolyline_conversion(wshed_lfp, output_path + output_prefix + 'wshed_lfp_{}.shp'.format(oid))
+
+                # XXX: May produce the longest flow path that is hydrologically invalid
+                wshed_lfp_path = output_path + output_prefix + 'wshed_lfp_{}.shp'.format(oid)
+                arcpy.RasterToPolyline_conversion(wshed_lfp, wshed_lfp_path)
+                arcpy.mp.ArcGISProject("CURRENT").activeMap.addDataFromPath(wshed_lfp_path)
         return
