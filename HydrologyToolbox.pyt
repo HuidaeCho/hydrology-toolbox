@@ -22,6 +22,7 @@
 #############################################################################
 
 import arcpy
+import re
 
 
 class Toolbox(object):
@@ -35,7 +36,8 @@ class Toolbox(object):
         self.tools = [
                 FlowAccumulation,
                 StreamNetworkDelineation,
-                WatershedDelineation
+                WatershedDelineation,
+                LongestFlowPath,
         ]
 
 
@@ -277,4 +279,93 @@ class WatershedDelineation(object):
         aprx = arcpy.mp.ArcGISProject("CURRENT")
         aprxMap = aprx.listMaps("Map")[0]
         aprxMap.addDataFromPath(watershedVect)
+        return
+        
+class LongestFlowPath(object):
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Longest Flow Path"
+        self.description = "This tool creates the longest flow path for multiple watersheds."
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+        """Define parameter definitions"""
+        fdir = arcpy.Parameter(
+                displayName="Flow Direction",
+                name="flow_direction",
+                datatype="GPRasterLayer",
+                parameterType="Required",
+                direction="Input")
+        outlets = arcpy.Parameter(
+                displayName="Outlets",
+                name="outlets",
+                datatype="GPFeatureRecordSetLayer",
+                parameterType="Required",
+                direction="Input")
+        output_path = arcpy.Parameter(
+                displayName="Output Folder Path",
+                name="output_path",
+                datatype="GPString",
+                parameterType="Required",
+                direction="Input")
+        output_prefix = arcpy.Parameter(
+                displayName="Output Prefix",
+                name="output_prefix",
+                datatype="GPString",
+                parameterType="Required",
+                direction="Input")          
+        params = [fdir, outlets, output_path, output_prefix]
+        return params
+
+    def isLicensed(self):
+        """Set whether tool is licensed to execute."""
+        return True
+
+    def updateParameters(self, parameters):
+        """Modify the values and properties of parameters before internal
+        validation is performed.  This method is called whenever a parameter
+        has been changed."""
+        return
+
+    def updateMessages(self, parameters):
+        """Modify the messages created by internal validation for each tool
+        parameter.  This method is called after internal validation."""
+        return
+
+    def execute(self, parameters, messages):
+        """The source code of the tool."""
+        fdir = parameters[0].valueAsText
+        outlets = parameters[1].valueAsText
+        output_path = parameters[2].value
+        output_prefix = parameters[3].value
+
+        output_path = re.sub(r'\\+$', '', output_path) + '\\'
+    
+        arcpy.env.extent = "MAXOF"
+        wsheds = arcpy.sa.Watershed(fdir, outlets, 'OBJECTID')
+        wsheds.save(output_path + output_prefix + 'wsheds.tif')
+    
+        with arcpy.da.SearchCursor(outlets, ['OID@']) as cur:
+            for row in cur:
+                oid = row[0]
+    
+                wshed = arcpy.sa.ExtractByAttributes(wsheds, 'VALUE = {}'.format(oid))
+                wshed.save(output_path + output_prefix + 'wshed_{}.tif'.format(oid))
+    
+                wshed_fdir = arcpy.sa.ExtractByMask(fdir, wshed)
+                wshed_fdir.save(output_path + output_prefix + 'wshed_fdir_{}.tif'.format(oid))
+    
+                wshed_uplen = arcpy.sa.FlowLength(wshed_fdir, "UPSTREAM")
+                wshed_uplen.save(output_path + output_prefix + 'wshed_uplen_{}.tif'.format(oid))
+    
+                wshed_dnlen = arcpy.sa.FlowLength(wshed_fdir, "DOWNSTREAM")
+                wshed_dnlen.save(output_path + output_prefix + 'wshed_dnlen_{}.tif'.format(oid))
+    
+                wshed_updnlen = wshed_uplen + wshed_dnlen
+                wshed_updnlen.save(output_path + output_prefix + 'wshed_updnlen_{}.tif'.format(oid))
+    
+                wshed_lfp = arcpy.sa.Con(wshed_updnlen >= int(wshed_updnlen.maximum), 1, 0)
+                wshed_lfp.save(output_path + output_prefix + 'wshed_lfp_{}.tif'.format(oid))
+    
+                arcpy.RasterToPolyline_conversion(wshed_lfp, output_path + output_prefix + 'wshed_lfp_{}.shp'.format(oid))
         return
