@@ -205,7 +205,7 @@ class StreamNetworkDelineation(object):
 
         arcpy.RasterToPolyline_conversion(stream_rast, stream_vect)
 
-        arcpy.mp.ArcGISProject("CURRENT").activeMap.addDataFromPath(stream_vect)
+        arcpy.mp.ArcGISProject('CURRENT').activeMap.addDataFromPath(stream_vect)
         return
 
 
@@ -267,14 +267,14 @@ class WatershedDelineation(object):
         wsheds_rast = parameters[2].valueAsText
         wsheds_vect = parameters[3].valueAsText
 
-        arcpy.env.extent = "MAXOF"
+        arcpy.env.extent = 'MAXOF'
         outlets_oid = arcpy.Describe(outlets).OIDFieldName
         wsheds_rast_out = arcpy.sa.Watershed(fdir, outlets, outlets_oid)
         wsheds_rast_out.save(wsheds_rast)
 
         arcpy.RasterToPolygon_conversion(wsheds_rast, wsheds_vect)
 
-        arcpy.mp.ArcGISProject("CURRENT").activeMap.addDataFromPath(wsheds_vect)
+        arcpy.mp.ArcGISProject('CURRENT').activeMap.addDataFromPath(wsheds_vect)
         return
 
 
@@ -338,7 +338,7 @@ class LongestFlowPath(object):
 
         output_path = re.sub(r'\\+$', '', output_path) + '\\'
 
-        arcpy.env.extent = "MAXOF"
+        arcpy.env.extent = 'MAXOF'
         wsheds = arcpy.sa.Watershed(fdir, outlets, 'OBJECTID')
         wsheds.save(output_path + output_prefix + 'wsheds.tif')
 
@@ -352,10 +352,10 @@ class LongestFlowPath(object):
                 wshed_fdir = arcpy.sa.ExtractByMask(fdir, wshed)
                 wshed_fdir.save(output_path + output_prefix + 'wshed_fdir_{}.tif'.format(oid))
 
-                wshed_uplen = arcpy.sa.FlowLength(wshed_fdir, "UPSTREAM")
+                wshed_uplen = arcpy.sa.FlowLength(wshed_fdir, 'UPSTREAM')
                 wshed_uplen.save(output_path + output_prefix + 'wshed_uplen_{}.tif'.format(oid))
 
-                wshed_dnlen = arcpy.sa.FlowLength(wshed_fdir, "DOWNSTREAM")
+                wshed_dnlen = arcpy.sa.FlowLength(wshed_fdir, 'DOWNSTREAM')
                 wshed_dnlen.save(output_path + output_prefix + 'wshed_dnlen_{}.tif'.format(oid))
 
                 wshed_updnlen = wshed_uplen + wshed_dnlen
@@ -367,5 +367,5 @@ class LongestFlowPath(object):
                 # XXX: May produce the longest flow path that is hydrologically invalid
                 wshed_lfp_path = output_path + output_prefix + 'wshed_lfp_{}.shp'.format(oid)
                 arcpy.RasterToPolyline_conversion(wshed_lfp, wshed_lfp_path)
-                arcpy.mp.ArcGISProject("CURRENT").activeMap.addDataFromPath(wshed_lfp_path)
+                arcpy.mp.ArcGISProject('CURRENT').activeMap.addDataFromPath(wshed_lfp_path)
         return
